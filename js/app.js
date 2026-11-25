@@ -695,7 +695,7 @@
     document.body.classList.add('no-sidebar'); currentLessonId = null; setActiveTop('visualize');
     SB.context = { where: 'visualizer' };
     $('#app').innerHTML = `<div class="page"><h1>🔍 ${t('vizTitle')}</h1><p class="lead">${t('vizLead')}</p>
-      <div class="samples"><span class="muted small">${t('samples')}</span> ${VIZ_SAMPLES.map((s, i) => `<button class="chip mono" data-v="${i}">${esc(s.slice(0, 48))}…</button>`).join('')}</div>
+      <div class="samples"><span class="muted small">${t('samples')}</span> ${VIZ_SAMPLES.map((s, i) => `<button class="chip mono" data-vs="${i}">${esc(s.slice(0, 48))}…</button>`).join('')}</div>
       <div class="editor-wrap" id="vizEd"></div>
       <div class="toolbar"><button class="btn primary" id="vizGo">${t('vizRun')}</button><span class="spacer"></span><label class="small">${t('dbLabel')} <select id="vizDb"><option value="main">${t('mainDb')}</option><option value="job">${t('jobDb')}</option></select></label></div>
       <div class="viz" id="vizOut"></div></div>`;
@@ -703,7 +703,7 @@
     const cm = SB.makeEditor($('#vizEd'), store.get('sqlbn-viz-draft', VIZ_SAMPLES[1]), go);
     cm.on('change', () => store.set('sqlbn-viz-draft', cm.getValue()));
     $('#vizGo').onclick = go;
-    $('#app').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { cm.setValue(VIZ_SAMPLES[+b.dataset.v]); go(); } };
+    $('#app').onclick = e => { const b = e.target.closest('[data-vs]'); if (b) { cm.setValue(VIZ_SAMPLES[+b.dataset.vs]); go(); } };
     go();
   }
 

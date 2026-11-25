@@ -79,7 +79,10 @@
     return hit ? hit.expr : g;
   }
 
-  // ধাপগুলো তৈরি
+  // ধাপগুলো তৈরি — প্রতিটি ধাপে: শিরোনাম, কী হলো, সংখ্যা (আগে/পরে), রঙের মানে, মনে রাখার কথা
+  const B = (bn, en) => ({ bn, en });
+  const C = s => `<code>${esc(String(s).replace(/\s+/g, ' ').trim())}</code>`;
+  const N = v => (I18N.lang === 'en' ? String(v) : n(v));
   function buildSteps(c, db) {
     const steps = [];
     const run = sql => { const r = db.exec(sql); return r.length ? r[r.length - 1] : { columns: [], values: [] }; };
@@ -88,35 +91,50 @@
     const H = c.having ? ` HAVING ${c.having}` : '';
     const isAgg = !c.groupBy && /\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT|TOTAL)\s*\(/i.test(c.selectBody) && !/\bOVER\b/i.test(c.selectBody);
     const hasWindow = /\bOVER\b/i.test(c.selectBody);
+    const rowsW = B('রো', 'rows'), groupsW = B('দল', 'groups');
 
     if (!c.from) {
-      steps.push({ key: 'select', clause: 'SELECT ' + c.select, data: run(c.sql),
-        explain: { bn: 'কোনো টেবিল নেই — SELECT শুধু এক্সপ্রেশনটি হিসাব করে একটি রো দেয়।', en: 'No table — SELECT just evaluates the expressions and returns one row.' } });
+      const d = run(c.sql);
+      steps.push({ key: 'select', clause: 'SELECT ' + c.select, data: d, count: d.values.length, unit: rowsW,
+        title: B('শুধু হিসাব', 'Just a calculation'),
+        what: B('এখানে কোনো টেবিল নেই। SELECT শুধু লেখা এক্সপ্রেশনগুলো হিসাব করে একটি রো দেয়।', 'There is no table here. SELECT just evaluates the expressions and returns one row.') });
       return steps;
     }
     // ১. FROM
     const base = run(`SELECT * FROM ${c.firstTable}`);
-    steps.push({ key: 'from', clause: 'FROM ' + c.firstTable, data: base,
-      explain: { bn: `প্রথমে ডেটাবেস <b>FROM</b>-এর টেবিল থেকে সব রো নেয় — মোট <b>${n(base.values.length)}</b>টি রো। SELECT-এ যা-ই লেখো, শুরুটা এখান থেকেই।`,
-        en: `First the database takes every row from the <b>FROM</b> table — <b>${base.values.length}</b> rows. Whatever SELECT says, everything starts here.` } });
+    steps.push({ key: 'from', clause: 'FROM ' + c.firstTable, data: base, count: base.values.length, unit: rowsW,
+      title: B('টেবিল থেকে সব রো নেওয়া', 'Take every row of the table'),
+      what: B(`${C(c.firstTable)} টেবিলের সব <b>${N(base.values.length)}</b>টি রো নেওয়া হলো। এখনো কোনো শর্ত বা হিসাব হয়নি।`, `All <b>${base.values.length}</b> rows of ${C(c.firstTable)} are taken. No filter or calculation yet.`),
+      stats: [[B('রো', 'Rows'), base.values.length, '']],
+      tip: B('কুয়েরিতে SELECT আগে লেখা হলেও ডেটাবেস কাজ শুরু করে FROM থেকে।', 'You write SELECT first, but the database starts its work at FROM.') });
     // ২. JOIN
     let joined = base;
     if (c.hasJoin) {
       joined = run(`SELECT * FROM ${c.from}`);
-      const isCross = /\bCROSS\s+JOIN\b|,/i.test(mask(c.from));
-      steps.push({ key: 'join', clause: 'FROM ' + c.from, data: joined,
-        explain: { bn: `<b>JOIN</b> অন্য টেবিলের রো জোড়া লাগায়${isCross ? ' (সব কম্বিনেশন)' : ' — ON শর্ত মিললে'}। এখন <b>${n(joined.values.length)}</b>টি রো, প্রতিটি রো-তে দুই টেবিলের কলাম পাশাপাশি। LEFT JOIN-এ মিল না পেলে ডান পাশে NULL দেখবে।`,
-          en: `<b>JOIN</b> attaches rows from the other table${isCross ? ' (every combination)' : ' wherever the ON condition matches'}. Now <b>${joined.values.length}</b> rows, with both tables' columns side by side. In a LEFT JOIN, unmatched rows get NULL on the right.` } });
+      const fm = mask(c.from);
+      const kind = /\bCROSS\s+JOIN\b|,/i.test(fm) ? 'cross' : /\bLEFT\b/i.test(fm) ? 'left' : /\bRIGHT\b/i.test(fm) ? 'right' : /\bFULL\b/i.test(fm) ? 'full' : 'inner';
+      const tip = {
+        cross: B('CROSS JOIN বা কমা দিলে প্রতিটি রো অন্য টেবিলের প্রতিটি রো-র সাথে জোড়া হয়, অর্থাৎ সব সম্ভাব্য জোড়া।', 'CROSS JOIN (or a comma) pairs every row with every row of the other table — all combinations.'),
+        left: B('LEFT JOIN-এ বাঁ দিকের টেবিলের সব রো থাকে। ডান দিকে মিল না পেলে সেই কলামগুলো NULL হয়।', 'LEFT JOIN keeps every row of the left table; where nothing matches, the right-hand columns are NULL.'),
+        right: B('RIGHT JOIN-এ ডান দিকের টেবিলের সব রো থাকে। বাঁ দিকে মিল না পেলে NULL হয়।', 'RIGHT JOIN keeps every row of the right table; unmatched left columns are NULL.'),
+        full: B('FULL JOIN-এ দুই দিকের সব রো থাকে। যেদিকে মিল নেই, সেদিকে NULL।', 'FULL JOIN keeps every row from both sides; NULL where there is no match.'),
+        inner: B('INNER JOIN-এ শুধু যেসব রো-র মিল আছে সেগুলো থাকে। মিল না পাওয়া রো বাদ পড়ে।', 'INNER JOIN keeps only rows that match; unmatched rows are dropped.')
+      }[kind];
+      steps.push({ key: 'join', clause: 'FROM ' + c.from, data: joined, count: joined.values.length, unit: rowsW,
+        title: B('টেবিল জোড়া লাগানো', 'Join the tables'),
+        what: B(`ON-এর শর্ত মিলিয়ে দুই টেবিলের রো পাশাপাশি বসানো হলো। প্রতিটি রো-তে এখন দুই টেবিলেরই কলাম আছে।`, `Rows of both tables are put side by side wherever the ON condition matches. Each row now has the columns of both tables.`),
+        stats: [[B('আগে', 'Before'), base.values.length, ''], [B('জোড়ার পরে', 'After join'), joined.values.length, '']], tip });
     }
     // ৩. WHERE
-    let afterWhere = joined.values.length;
     if (c.where) {
       const d = run(`SELECT CASE WHEN (${c.where}) THEN 1 ELSE 0 END AS __keep, * FROM ${c.from}`);
       const kept = d.values.filter(r => r[0] === 1).length;
-      afterWhere = kept;
-      steps.push({ key: 'where', clause: 'WHERE ' + c.where, data: d, mode: 'filter',
-        explain: { bn: `<b>WHERE</b> প্রতিটি রো-তে শর্তটি পরীক্ষা করে। সত্য হলে রাখে (সবুজ), না হলে বাদ (লাল কাটা)। <b>${n(kept)}</b>টি রাখা হলো, <b>${n(d.values.length - kept)}</b>টি বাদ। মনে রেখো: এই ধাপে এখনো গ্রুপ বা SELECT-এর alias তৈরি হয়নি।`,
-          en: `<b>WHERE</b> tests the condition on every row. True → kept (green), otherwise removed (struck out). <b>${kept}</b> kept, <b>${d.values.length - kept}</b> removed. Note: groups and SELECT aliases don't exist yet at this step.` } });
+      steps.push({ key: 'where', clause: 'WHERE ' + c.where, data: d, mode: 'filter', count: kept, unit: rowsW,
+        title: B('শর্ত দিয়ে রো ছাঁকা', 'Filter rows with a condition'),
+        what: B(`প্রতিটি রো-তে ${C(c.where)} শর্তটি পরীক্ষা করা হলো। যেসব রো-তে শর্ত সত্য, শুধু সেগুলো থাকল।`, `The condition ${C(c.where)} is tested on every row; only rows where it is true remain.`),
+        stats: [[B('পরীক্ষা হলো', 'Checked'), d.values.length, ''], [B('রাখা হলো', 'Kept'), kept, 'ok'], [B('বাদ পড়ল', 'Removed'), d.values.length - kept, 'bad']],
+        legend: 'filter',
+        tip: B('এই ধাপে এখনো দল তৈরি হয়নি, SELECT-এর নতুন নামও (alias) তৈরি হয়নি। তাই WHERE-এ COUNT() বা alias ব্যবহার করা যায় না।', 'Groups and SELECT aliases do not exist yet at this step — that is why WHERE cannot use COUNT() or an alias.') });
     }
     // ৪. GROUP BY
     if (c.groupBy) {
@@ -124,45 +142,54 @@
       const key = gItems.map(g => `quote(${g})`).join(" || ' | ' || ");
       const d = run(`SELECT ${key} AS __grp, * FROM ${c.from}${W} ORDER BY 1`);
       const ng = new Set(d.values.map(r => r[0])).size;
-      steps.push({ key: 'group', clause: 'GROUP BY ' + c.groupBy, data: d, mode: 'group',
-        explain: { bn: `<b>GROUP BY</b> একই <code>${esc(c.groupBy)}</code> মানের রোগুলোকে এক দলে রাখে — একই রঙ = একই দল। মোট <b>${n(ng)}</b>${t('groups')}। এরপর প্রতিটি দল থেকে একটি করে রো তৈরি হবে, আর COUNT/SUM/AVG প্রতিটি দলের ভেতরে আলাদাভাবে হিসাব হবে।`,
-          en: `<b>GROUP BY</b> puts rows with the same <code>${esc(c.groupBy)}</code> into one group — same colour = same group. <b>${ng}</b> groups. Each group will become one output row, and COUNT/SUM/AVG are computed inside each group separately.` } });
+      steps.push({ key: 'group', clause: 'GROUP BY ' + c.groupBy, data: d, mode: 'group', count: ng, unit: groupsW,
+        title: B('একই মানের রো এক দলে রাখা', 'Put equal values into groups'),
+        what: B(`${C(c.groupBy)}-এর মান যেসব রো-তে একই, সেগুলো এক দলে রাখা হলো। টেবিলে একই রঙের রোগুলো একই দলের।`, `Rows with the same ${C(c.groupBy)} are put into one group. Rows of the same colour belong to the same group.`),
+        stats: [[B('রো', 'Rows'), d.values.length, ''], [B('দল', 'Groups'), ng, 'ok']],
+        legend: 'group',
+        tip: B('প্রতিটি দল শেষে একটি রো হবে। COUNT, SUM, AVG-এর হিসাব প্রতিটি দলের ভেতরে আলাদাভাবে হয়।', 'Each group becomes one row at the end; COUNT, SUM and AVG are computed separately inside each group.') });
       // ৫. HAVING
       if (c.having) {
-        // SELECT লিস্টসহ চালাই যাতে HAVING-এ alias থাকলেও কাজ করে, আর প্রতিটি দলের হিসাবও দেখা যায়
         const hd = run(`SELECT ${c.selectBody}, CASE WHEN (${c.having}) THEN 1 ELSE 0 END AS __keep FROM ${c.from}${W}${G}`);
         const keepIdx = hd.columns.length - 1;
         const kept = hd.values.filter(r => r[keepIdx] === 1).length;
-        steps.push({ key: 'having', clause: 'HAVING ' + c.having, data: hd, mode: 'filterLast',
-          explain: { bn: `<b>HAVING</b> এখন পুরো <b>দলের</b> উপর শর্ত পরীক্ষা করে (WHERE করেছিল প্রতিটি রো-র উপর)। এজন্যই এখানে COUNT(*), SUM() ব্যবহার করা যায়। <b>${n(kept)}</b>টি দল টিকে গেল, <b>${n(hd.values.length - kept)}</b>টি বাদ।`,
-            en: `<b>HAVING</b> now tests the condition on whole <b>groups</b> (WHERE worked on single rows). That's why COUNT(*) and SUM() are allowed here. <b>${kept}</b> groups survive, <b>${hd.values.length - kept}</b> removed.` } });
+        steps.push({ key: 'having', clause: 'HAVING ' + c.having, data: hd, mode: 'filterLast', count: kept, unit: groupsW,
+          title: B('শর্ত দিয়ে দল ছাঁকা', 'Filter the groups'),
+          what: B(`প্রতিটি <b>দলের</b> উপর ${C(c.having)} পরীক্ষা করা হলো। যেসব দলে শর্ত সত্য, শুধু সেগুলো থাকল।`, `The condition ${C(c.having)} is tested on every <b>group</b>; only groups where it is true remain.`),
+          stats: [[B('দল', 'Groups'), hd.values.length, ''], [B('রাখা হলো', 'Kept'), kept, 'ok'], [B('বাদ পড়ল', 'Removed'), hd.values.length - kept, 'bad']],
+          legend: 'filter',
+          tip: B('WHERE ছাঁকে একেকটি রো (দল বানানোর আগে), আর HAVING ছাঁকে পুরো দল (দল বানানোর পরে)। এজন্যই HAVING-এ COUNT(), SUM() লেখা যায়।', 'WHERE filters single rows (before grouping); HAVING filters whole groups (after grouping). That is why HAVING can use COUNT() and SUM().') });
       }
     }
     // ৬. SELECT
     const sel = run(`SELECT ${c.selectBody} FROM ${c.from}${W}${G}${H}`);
-    let selExplainBn = `<b>SELECT</b> এখন চলে — কোন কলাম দেখাবে ও কী হিসাব করবে। `;
-    let selExplainEn = `<b>SELECT</b> runs now — choosing columns and computing expressions. `;
-    if (c.groupBy) { selExplainBn += `প্রতিটি দল থেকে একটি রো, তাই <b>${n(sel.values.length)}</b>টি রো। `; selExplainEn += `One row per group, so <b>${sel.values.length}</b> rows. `; }
-    else if (isAgg) { selExplainBn += 'GROUP BY ছাড়া অ্যাগ্রিগেট পুরো টেবিলকে একটি দল ধরে — তাই একটি রো। '; selExplainEn += 'An aggregate without GROUP BY treats the whole table as one group — so one row. '; }
-    if (hasWindow) { selExplainBn += 'উইন্ডো ফাংশন (OVER) এই ধাপে হিসাব হয় — রো না কমিয়ে। '; selExplainEn += 'Window functions (OVER) are computed in this step — without collapsing rows. '; }
-    selExplainBn += 'এখানে তৈরি alias (AS) শুধু এর পরের ধাপগুলো (ORDER BY) ব্যবহার করতে পারে।';
-    selExplainEn += 'Aliases (AS) created here can only be used by later steps (ORDER BY).';
-    steps.push({ key: 'select', clause: 'SELECT ' + c.selectBody, data: sel, explain: { bn: selExplainBn, en: selExplainEn } });
+    let wb, we;
+    if (c.groupBy) { wb = `প্রতিটি দল থেকে একটি করে রো বানানো হলো, আর ${C(c.selectBody)} হিসাব করা হলো।`; we = `One row is built from each group and ${C(c.selectBody)} is computed.`; }
+    else if (isAgg) { wb = `GROUP BY নেই, কিন্তু অ্যাগ্রিগেট ফাংশন আছে। তাই পুরো টেবিলকে একটি দল ধরে হিসাব হলো, ফলাফল একটি রো।`; we = 'There is no GROUP BY but there is an aggregate, so the whole table is treated as one group — one result row.'; }
+    else { wb = `প্রতিটি রো থেকে দরকারি কলামগুলো বেছে নেওয়া হলো: ${C(c.selectBody)}।`; we = `The needed columns are picked from every row: ${C(c.selectBody)}.`; }
+    if (hasWindow) { wb += ' উইন্ডো ফাংশন (OVER) এই ধাপেই হিসাব হয়, আর রো-এর সংখ্যা কমে না।'; we += ' Window functions (OVER) are computed here, without reducing the rows.'; }
+    steps.push({ key: 'select', clause: 'SELECT ' + c.selectBody, data: sel, count: sel.values.length, unit: rowsW,
+      title: B('কলাম বাছাই ও হিসাব', 'Pick columns and compute'), what: B(wb, we),
+      stats: [[B('রো', 'Rows'), sel.values.length, ''], [B('কলাম', 'Columns'), sel.columns.length, '']],
+      tip: B('এখানে দেওয়া নতুন নাম (AS) শুধু পরের ধাপগুলোতে, অর্থাৎ ORDER BY-তে ব্যবহার করা যায়।', 'A name given here with AS can only be used by later steps — that is, ORDER BY.') });
     // ৭. DISTINCT
     let cur = sel;
     if (c.distinct) {
       cur = run(`SELECT DISTINCT ${c.selectBody} FROM ${c.from}${W}${G}${H}`);
-      steps.push({ key: 'distinct', clause: 'DISTINCT', data: cur,
-        explain: { bn: `<b>DISTINCT</b> হুবহু একই রোগুলোর একটি করে রাখে: <b>${n(sel.values.length)}</b> → <b>${n(cur.values.length)}</b>টি রো।`,
-          en: `<b>DISTINCT</b> keeps one copy of identical rows: <b>${sel.values.length}</b> → <b>${cur.values.length}</b> rows.` } });
+      steps.push({ key: 'distinct', clause: 'DISTINCT', data: cur, count: cur.values.length, unit: rowsW,
+        title: B('ডুপ্লিকেট বাদ দেওয়া', 'Remove duplicates'),
+        what: B('হুবহু একই রোগুলোর মধ্যে একটি করে রাখা হলো।', 'Of rows that are exactly the same, one copy is kept.'),
+        stats: [[B('আগে', 'Before'), sel.values.length, ''], [B('পরে', 'After'), cur.values.length, 'ok'], [B('বাদ পড়ল', 'Removed'), sel.values.length - cur.values.length, 'bad']] });
     }
     const S = `SELECT ${c.distinct ? 'DISTINCT ' : ''}${c.selectBody} FROM ${c.from}${W}${G}${H}`;
     // ৮. ORDER BY
     if (c.orderBy) {
       cur = run(`${S} ORDER BY ${c.orderBy}`);
-      steps.push({ key: 'order', clause: 'ORDER BY ' + c.orderBy, data: cur,
-        explain: { bn: '<b>ORDER BY</b> ফলাফল সাজায়। এটা SELECT-এর পরে চলে, তাই SELECT-এর alias এখানে ব্যবহার করা যায়। ASC = ছোট থেকে বড়, DESC = বড় থেকে ছোট।',
-          en: '<b>ORDER BY</b> sorts the result. It runs after SELECT, so SELECT aliases work here. ASC = smallest first, DESC = largest first.' } });
+      const desc = /\bDESC\b/i.test(c.orderBy);
+      steps.push({ key: 'order', clause: 'ORDER BY ' + c.orderBy, data: cur, count: cur.values.length, unit: rowsW,
+        title: B('ফলাফল সাজানো', 'Sort the result'),
+        what: B(`ফলাফল ${C(c.orderBy)} অনুযায়ী ${desc ? 'বড় থেকে ছোট' : 'ছোট থেকে বড়'} ক্রমে সাজানো হলো। রো-এর সংখ্যা বদলায়নি।`, `The result is sorted by ${C(c.orderBy)}, ${desc ? 'largest first' : 'smallest first'}. The number of rows does not change.`),
+        tip: B('ASC মানে ছোট থেকে বড় (এটাই ডিফল্ট), DESC মানে বড় থেকে ছোট। ORDER BY চলে SELECT-এর পরে, তাই এখানে alias ব্যবহার করা যায়।', 'ASC = smallest first (the default), DESC = largest first. ORDER BY runs after SELECT, so aliases work here.') });
     }
     // ৯. LIMIT
     if (c.limit) {
@@ -173,9 +200,14 @@
         else if (splitTop(c.limit).length === 2) { const [a, b] = splitTop(c.limit); const r = run(`SELECT (${b}), (${a})`).values[0]; lim = r[0]; off = r[1]; }
         else lim = run(`SELECT (${c.limit})`).values[0][0];
       } catch (e) { lim = cur.values.length; }
-      steps.push({ key: 'limit', clause: 'LIMIT ' + c.limit, data: cur, mode: 'range', range: [off, off + lim],
-        explain: { bn: `সবশেষে <b>LIMIT</b>${off ? ` / OFFSET` : ''}: ${off ? `প্রথম <b>${n(off)}</b>টি বাদ দিয়ে ` : ''}<b>${n(lim)}</b>টি রো রাখে। এটা সবার শেষে চলে — তাই ORDER BY ছাড়া LIMIT দিলে কোন রো আসবে নিশ্চিত নয়।`,
-          en: `Finally <b>LIMIT</b>${off ? ' / OFFSET' : ''}: ${off ? `skip <b>${off}</b> rows, then ` : ''}keep <b>${lim}</b> rows. It runs last — which is why LIMIT without ORDER BY gives unpredictable rows.` } });
+      const keep = Math.max(0, Math.min(lim, cur.values.length - off));
+      steps.push({ key: 'limit', clause: 'LIMIT ' + c.limit, data: cur, mode: 'range', range: [off, off + lim], count: keep, unit: rowsW,
+        title: B('নির্দিষ্ট সংখ্যক রো রাখা', 'Keep only some rows'),
+        what: off ? B(`প্রথম <b>${N(off)}</b>টি রো বাদ দিয়ে পরের <b>${N(lim)}</b>টি রাখা হলো (সবুজ)।`, `The first <b>${off}</b> rows are skipped and the next <b>${lim}</b> are kept (green).`)
+          : B(`শুধু প্রথম <b>${N(lim)}</b>টি রো রাখা হলো (সবুজ), বাকিগুলো বাদ।`, `Only the first <b>${lim}</b> rows are kept (green); the rest are dropped.`),
+        stats: [[B('আগে', 'Before'), cur.values.length, ''], [B('রাখা হলো', 'Kept'), keep, 'ok']],
+        legend: 'filter',
+        tip: B('LIMIT সবার শেষে চলে। তাই ORDER BY ছাড়া LIMIT দিলে কোন রোগুলো আসবে তা নিশ্চিত নয়।', 'LIMIT runs last — so without ORDER BY you cannot be sure which rows you get.') });
     }
     return steps;
   }
@@ -200,6 +232,11 @@
     const rc = rowClass ? (r, i) => rowClass(d.values[i], i) : null;
     return SB.tableHTML(view, '', { rowClass: rc, max: 300 });
   }
+  function legendHTML(s) {
+    if (s.legend === 'filter') return `<div class="viz-legend"><span><i class="lg keep"></i>${pick(B('সবুজ = রাখা হলো', 'green = kept'))}</span><span><i class="lg drop"></i>${pick(B('লাল ও কাটা = বাদ পড়ল', 'red, struck out = removed'))}</span></div>`;
+    if (s.legend === 'group') return `<div class="viz-legend"><span><i class="lg g0"></i><i class="lg g1"></i><i class="lg g2"></i>${pick(B('একই রঙ = একই দল', 'same colour = same group'))}</span></div>`;
+    return '';
+  }
 
   // container-এ ভিজুয়ালাইজার আঁকে
   function render(container, sql, db) {
@@ -218,35 +255,50 @@
     }
     if (ownDb) db.close();
     let i = 0, timer = null;
-    const present = new Set(steps.map(s => s.key));
+    const byKey = Object.fromEntries(steps.map((s, k) => [s.key, k]));
+    const L = I18N.lang === 'en';
     function draw() {
-      const s = steps[i];
+      const s = steps[i], last = i === steps.length - 1;
       container.innerHTML = `
-        <div class="viz-order">${ORDER.map(k => `<button class="viz-chip ${present.has(k) ? 'on' : 'off'} ${s.key === k ? 'cur' : ''}" data-k="${k}" ${present.has(k) ? '' : 'disabled'}>${STEP_LABEL[k]}</button>`).join('<span class="viz-arrow">→</span>')}</div>
+        <div class="viz-order" role="tablist">${ORDER.map(k => { const k2 = byKey[k], st = steps[k2];
+          return `<button class="viz-chip ${st ? 'on' : 'off'} ${s.key === k ? 'cur' : ''} ${st && k2 < i ? 'done' : ''}" data-k="${k}" ${st ? '' : 'disabled'} title="${st ? esc(pick(st.title)) : ''}"><b>${STEP_LABEL[k]}</b><small>${st ? `${N(st.count)} ${pick(st.unit)}` : '—'}</small></button>`; }).join('<span class="viz-arrow">→</span>')}</div>
         <div class="viz-step">
-          <div class="viz-head"><span class="viz-num">${t('step')} ${n(i + 1)}/${n(steps.length)}</span><pre class="viz-clause">${esc(s.clause)}</pre></div>
-          <p class="viz-explain">${pick(s.explain)}</p>
-          ${stepTable(s)}
+          <div class="viz-head">
+            <span class="viz-num"><small>${t('step')}</small><b>${N(i + 1)}/${N(steps.length)}</b></span>
+            <div class="viz-title"><h3>${esc(pick(s.title))}</h3><pre class="viz-clause">${esc(s.clause)}</pre></div>
+          </div>
+          <p class="viz-explain">${pick(s.what)}</p>
+          ${s.stats ? `<div class="viz-stats">${s.stats.map(([lb, v, cls]) => `<span class="viz-stat ${cls}"><small>${esc(pick(lb))}</small><b>${N(v)}</b></span>`).join('')}</div>` : ''}
+          ${s.tip ? `<div class="viz-tip"><span>💡</span><div><b>${L ? 'Remember' : 'মনে রাখো'}:</b> ${pick(s.tip)}</div></div>` : ''}
+          ${legendHTML(s)}
+          <div class="viz-tablebox">${stepTable(s)}</div>
+          ${last ? `<div class="viz-final">✅ ${L ? 'This is the final result of the query.' : 'এটাই কুয়েরির চূড়ান্ত ফলাফল।'}</div>` : ''}
         </div>
         <div class="viz-controls">
-          <button class="btn sm" data-v="prev" ${i === 0 ? 'disabled' : ''}>${t('prev')}</button>
-          <button class="btn sm" data-v="play">${timer ? t('pause') : t('play')}</button>
-          <button class="btn sm primary" data-v="next" ${i === steps.length - 1 ? 'disabled' : ''}>${t('next')}</button>
+          <button class="btn sm" data-vstep="prev" ${i === 0 ? 'disabled' : ''}>${t('prev')}</button>
+          <button class="btn sm" data-vstep="play">${timer ? t('pause') : t('play')}</button>
+          <button class="btn sm primary" data-vstep="next" ${last ? 'disabled' : ''}>${t('next')}</button>
         </div>`;
       SB.highlight(SB.$('.viz-clause', container));
+      const cur = SB.$('.viz-chip.cur', container); if (cur && cur.scrollIntoView) { const o = SB.$('.viz-order', container); o.scrollLeft = cur.offsetLeft - o.clientWidth / 2 + cur.clientWidth / 2; }
     }
     function stop() { clearInterval(timer); timer = null; }
+    // ধাপের বাটনের ক্লিক পেজের অন্য হ্যান্ডলারে (যেমন উদাহরণ বাটন) পৌঁছাবে না
     container.onclick = e => {
-      const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.k) { stop(); i = steps.findIndex(s => s.key === b.dataset.k); draw(); return; }
-      if (b.dataset.v === 'prev') { stop(); i = Math.max(0, i - 1); }
-      if (b.dataset.v === 'next') { stop(); i = Math.min(steps.length - 1, i + 1); }
-      if (b.dataset.v === 'play') {
+      const b = e.target.closest('button'); if (!b || !container.contains(b)) return;
+      e.stopPropagation();
+      if (b.dataset.k) { stop(); i = byKey[b.dataset.k]; draw(); return; }
+      const v = b.dataset.vstep; if (!v) return;
+      if (v === 'prev') { stop(); i = Math.max(0, i - 1); }
+      if (v === 'next') { stop(); i = Math.min(steps.length - 1, i + 1); }
+      if (v === 'play') {
         if (timer) stop();
-        else { if (i === steps.length - 1) i = 0; timer = setInterval(() => { if (!container.isConnected || i >= steps.length - 1) { stop(); if (container.isConnected) draw(); return; } i++; draw(); }, 2600); }
+        else { if (i === steps.length - 1) i = 0; timer = setInterval(() => { if (!container.isConnected || i >= steps.length - 1) { stop(); if (container.isConnected) draw(); return; } i++; draw(); }, 3200); }
       }
       draw();
     };
+    container.tabIndex = 0;
+    container.onkeydown = e => { if (e.key === 'ArrowRight' && i < steps.length - 1) { stop(); i++; draw(); } if (e.key === 'ArrowLeft' && i > 0) { stop(); i--; draw(); } };
     draw();
   }
 
