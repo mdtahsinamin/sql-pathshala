@@ -1,0 +1,98 @@
+/* নতুন অংশ: হোমের বাড়তি কার্ড, ডিবাগ/রিড, DBMS তত্ত্ব, কেস স্টাডি, তুলনা, কুয়েরি প্ল্যান, প্রিন্ট */
+.home-extra { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 8px 0 22px; }
+.hx-card { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); min-width: 0; }
+a.hx-card:hover { text-decoration: none; border-color: var(--accent); }
+.hx-card.daily { background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
+.hx-card.daily.done { border-left: 4px solid var(--accent); }
+.hx-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.hx-streak { color: var(--warn); }
+.hx-bot { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; }
+.hx-card ul { margin: 0; padding-left: 18px; }
+.hx-card.links a { display: block; padding: 3px 0; }
+.hub-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 6px 0 18px; }
+.hub-more-card { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.hub-more-card:hover { text-decoration: none; border-color: var(--accent); }
+.hub-more-card span { grid-row: span 2; font-size: 26px; align-self: center; }
+.hub-more-card small { color: var(--muted); }
+/* ডিবাগ ও কুয়েরি পড়া */
+.dbg-bug { margin: 8px 0 0; font-size: 13px; border-left: 3px solid var(--danger); }
+.rd-list { display: grid; gap: 14px; }
+.rd-card { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; background: var(--surface); min-width: 0; }
+.rd-card.ok { border-left: 4px solid var(--accent); }
+.rd-card.bad { border-left: 4px solid var(--danger); }
+.rd-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.rd-card pre.syntax { margin: 0 0 10px; font-size: 13.5px; }
+.rd-res { margin-top: 10px; }
+.rd-xp { margin-top: 8px; }
+.rd-xp > summary { cursor: pointer; font-weight: 600; }
+/* DBMS তত্ত্ব */
+.th-tbl { border-collapse: collapse; margin: 8px 0 14px; font-size: 14.5px; width: 100%; display: block; overflow-x: auto; }
+.th-tbl th, .th-tbl td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.th-tbl th { background: var(--surface-2); }
+.th-article pre.syntax { font-size: 13px; overflow-x: auto; }
+.th-tool { margin: 28px 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.th-tool h2 { margin-top: 0; border-bottom: 0; }
+.th-tool-in { display: grid; gap: 10px; }
+.th-tool-in label { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+.th-tool-in input, .th-tool-in textarea { font-family: var(--mono, monospace); font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+.th-res { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); line-height: 1.8; }
+.th-nf { margin-top: 6px; font-weight: 700; }
+.th-nfb { display: inline-block; padding: 1px 12px; border-radius: 999px; background: var(--accent); color: #fff; }
+.th-quiz { margin-top: 30px; }
+/* তুলনা */
+.cmp h4 { margin: 16px 0 6px; }
+.cmp-tbl { border-collapse: collapse; margin: 6px 0 10px; }
+.cmp-tbl th, .cmp-tbl td { border: 1px solid var(--border); padding: 5px 14px; text-align: center; }
+.cmp-tbl td.ok { color: var(--accent-2); font-weight: 700; } .cmp-tbl td.bad { color: var(--danger); font-weight: 700; }
+.cmp-row { margin: 6px 0; line-height: 1.7; }
+.cmp-row.bad { color: var(--danger); }
+.cmp-side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cmp-side > div { min-width: 0; }
+@media (max-width: 760px) { .cmp-side { grid-template-columns: 1fr; } }
+/* কুয়েরি প্ল্যান */
+#xpPlan:not(:empty) { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+#xpPlan h3 { margin-top: 0; }
+.plan-tree { list-style: none; margin: 4px 0; padding-left: 18px; border-left: 2px dashed var(--border); }
+.plan-box > .plan-tree { border-left: 0; padding-left: 0; }
+.plan-tree li { margin: 6px 0; }
+.plan-node { display: inline-flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); }
+.plan-node.bad { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.plan-node.ok { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.plan-node.mid { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.plan-node.info { background: var(--blue-soft); }
+.plan-node small { color: var(--text-2); }
+.plan-sug { margin-top: 12px; display: grid; gap: 8px; }
+.plan-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+@media (max-width: 760px) { .plan-cmp { grid-template-columns: 1fr; } }
+/* প্রশ্ন থেকে SQL */
+.xp-nl { display: flex; gap: 8px; margin: 10px 0 6px; }
+.xp-nl input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+#xpNlOut:not(:empty) { margin-bottom: 8px; white-space: pre-wrap; }
+#xpNlOut .err { color: var(--danger); }
+.cs-schema { margin: 12px 0; overflow-x: auto; }
+/* প্রিন্ট */
+.print-doc { background: #fff; color: #111; padding: 24px; border-radius: 12px; border: 1px solid var(--border); line-height: 1.6; }
+.print-doc h1 { font-size: 24px; } .print-doc h2 { font-size: 19px; margin-top: 22px; border-bottom: 1px solid #ccc; }
+.print-doc pre { background: #f4f4f4; color: #111; padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; font-size: 12.5px; }
+.print-doc code { background: #f0f0f0; color: #111; }
+.print-doc .pr-q { margin: 10px 0; break-inside: avoid; }
+.print-doc .pr-bn { color: #444; font-size: 14px; }
+.print-doc .pr-ans { font-weight: 700; text-decoration: underline; }
+.print-doc .pr-ex { font-size: 13.5px; color: #333; border-left: 3px solid #0e9f6e; padding-left: 8px; margin-top: 4px; }
+.print-doc .pr-fix { border-left: 3px solid #0e9f6e; }
+.print-doc table { border-collapse: collapse; } .print-doc th, .print-doc td { border: 1px solid #bbb; padding: 4px 8px; }
+.pr-foot { margin-top: 24px; color: #777; font-size: 12px; text-align: center; }
+@media print {
+  header, .topbar, .topnav, #tutorFab, .tutor, .sidebar, .no-print, .toast, footer { display: none !important; }
+  body, #app, .page { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; max-width: none !important; }
+  .print-doc { border: 0; padding: 0; }
+  a { color: #000; text-decoration: none; }
+}
+@media (max-width: 640px) { .xp-nl { flex-direction: column; } .print-doc { padding: 14px; } }
+/* ১৩টি মেনু — ছোট পর্দায় ঘন করে, না আঁটলে আড়াআড়ি স্ক্রল */
+.topnav { min-width: 0; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; gap: 2px; }
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a { white-space: nowrap; flex: none; }
+@media (max-width: 1680px) { .topnav a { padding: 6px 9px; font-size: 15px; } }
+@media (max-width: 1440px) { .topnav a { padding: 5px 7px; font-size: 14px; } }
+.home-extra { align-items: start; }

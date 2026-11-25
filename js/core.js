@@ -237,6 +237,7 @@
     tableHTML, runInline, compare, checkExercise, expectedResult, highlight, makeEditor, formatSql, modal, download,
     onChange(fn) { listeners.push(fn); },
     activeEditor: null,
+    seedOf: k => (k === 'job' ? window.JOB_SEED_SQL : (window.CASE_SEEDS && window.CASE_SEEDS[k]) || window.SEED_SQL),
     pgDb: null,
     context: {}   // টিউটরের জন্য বর্তমান পেজের তথ্য
   };

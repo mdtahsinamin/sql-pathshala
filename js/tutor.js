@@ -14,6 +14,16 @@
 
   const getKey = () => { try { return localStorage.getItem('sqlbn-ai-key') || ''; } catch (e) { return ''; } };
   const getModel = () => store.get('sqlbn-ai-model', MODELS[0][0]);
+  // সাইটের মালিক js/config.js-এ proxy দিলে key ছাড়াই সবাই AI পায়; ইউজার নিজের proxy-ও দিতে পারে
+  const getProxy = () => store.get('sqlbn-ai-proxy', '') || ((window.SQLBN_CONFIG || {}).aiProxy || '');
+  const isOnline = () => !!(getKey() || getProxy());
+  function makeClient(Anthropic) {
+    const proxy = getProxy();
+    // নিজের key থাকলে সরাসরি Anthropic-এ; না থাকলে proxy (proxy সার্ভারে আসল key থাকে)
+    if (getKey()) return new Anthropic({ apiKey: getKey(), dangerouslyAllowBrowser: true });
+    return new Anthropic({ apiKey: 'proxy', baseURL: proxy.replace(/\/+$/, ''), dangerouslyAllowBrowser: true });
+  }
+  const proxyModel = () => (getKey() ? getModel() : ((window.SQLBN_CONFIG || {}).aiModel || getModel()));
 
   // ───────────── ছোট Markdown রেন্ডারার ─────────────
   function md(text) {
@@ -180,8 +190,8 @@ ${schemaText()}`;
     if (!sdkPromise) sdkPromise = import(SDK_URL);
     const mod = await sdkPromise;
     const Anthropic = mod.default;
-    const client = new Anthropic({ apiKey: getKey(), dangerouslyAllowBrowser: true });
-    const model = getModel();
+    const client = makeClient(Anthropic);
+    const model = proxyModel();
     const msg = { role: 'user', content: `[Site language: ${I18N.lang === 'en' ? 'English' : 'Bangla'}]\n[Context]\n${contextText()}\n[/Context]\n\n${userText}` };
     const messages = [...history, msg];
     const params = {
@@ -221,7 +231,7 @@ ${schemaText()}`;
   }
   function draw() {
     const p = $('#tutorPanel'); if (!p) return;
-    const online = !!getKey();
+    const online = isOnline();
     p.innerHTML = `
       <div class="tutor-head">
         <b>🤖 ${t('tutorTitle')}</b>
@@ -234,6 +244,7 @@ ${schemaText()}`;
       <div class="tutor-settings" hidden>
         <p class="muted">${t('keyHelp')}</p>
         <label>${t('apiKey')}<input type="password" id="tKey" placeholder="sk-ant-..." value="${esc(getKey())}" autocomplete="off"></label>
+        <label>Proxy URL <small class="muted">(${I18N.lang === 'en' ? 'optional — instead of a key' : 'ঐচ্ছিক — key-এর বদলে'})</small><input id="tProxy" placeholder="https://….workers.dev" value="${esc(store.get('sqlbn-ai-proxy', ''))}" autocomplete="off"></label>
         <label>${t('model')}<select id="tModel">${MODELS.map(([id, l]) => `<option value="${id}" ${id === getModel() ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="toolbar"><button class="btn sm primary" data-a="save">${t('save')}</button><button class="btn sm" data-a="remove">${t('removeKey')}</button></div>
         <p class="muted">${t('offlineMode')}</p>
@@ -258,7 +269,7 @@ ${schemaText()}`;
     if (a === 'close') toggle(false);
     if (a === 'settings') { const s = $('.tutor-settings', p); s.hidden = !s.hidden; }
     if (a === 'clear') { history = []; offline.hintIdx = 0; draw(); }
-    if (a === 'save') { try { localStorage.setItem('sqlbn-ai-key', $('#tKey', p).value.trim()); } catch (e2) { } store.set('sqlbn-ai-model', $('#tModel', p).value); SB.toast(t('keySaved')); draw(); }
+    if (a === 'save') { try { localStorage.setItem('sqlbn-ai-key', $('#tKey', p).value.trim()); } catch (e2) { } store.set('sqlbn-ai-model', $('#tModel', p).value); store.set('sqlbn-ai-proxy', $('#tProxy', p).value.trim()); SB.toast(t('keySaved')); draw(); }
     if (a === 'remove') { try { localStorage.removeItem('sqlbn-ai-key'); } catch (e2) { } draw(); }
     if (b.dataset.q) {
       const labels = { explain: t('qaExplain'), wrong: t('qaWrong'), hint: t('qaHint'), concept: t('qaConcept') };
@@ -279,7 +290,7 @@ ${schemaText()}`;
     text = (text || '').trim(); if (!text || busy) return;
     const ta = $('#tText'); if (ta) ta.value = '';
     addMsg('me', esc(text));
-    if (!getKey()) {
+    if (!isOnline()) {
       const reply = offline(action || 'free', text);
       addMsg('bot', md(reply));
       highlightIn($('#tMsgs').lastElementChild);
@@ -303,7 +314,30 @@ ${schemaText()}`;
     if (want) setTimeout(() => { const ta = $('#tText'); if (ta) ta.focus(); }, 50);
   }
   // বাইরে থেকে: SB.tutor.ask('wrong') ইত্যাদি
+  // ইতিহাস ছাড়া এক-বারের অনুরোধ (যেমন প্রশ্ন থেকে SQL বানানো)
+  async function complete(system, userText, onDelta) {
+    if (!sdkPromise) sdkPromise = import(SDK_URL);
+    const mod = await sdkPromise; const Anthropic = mod.default;
+    const client = makeClient(Anthropic); const model = proxyModel();
+    const params = { model, max_tokens: 4000, output_config: { effort: 'low' }, system, messages: [{ role: 'user', content: userText }] };
+    if (model !== 'claude-haiku-5-5') { params.betas = ['server-side-fallback-2026-07-01']; params.fallbacks = 'default'; }
+    let text = '';
+    try {
+      const stream = client.beta.messages.stream(params);
+      for await (const ev of stream) if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') { text += ev.delta.text; if (onDelta) onDelta(ev.delta.text); }
+      const final = await stream.finalMessage();
+      if (final.stop_reason === 'refusal') return { error: t('errRefusal') };
+      return { text };
+    } catch (e) {
+      if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return { error: t('errAuth') };
+      if (e instanceof Anthropic.RateLimitError) return { error: t('errRate') };
+      if (e instanceof Anthropic.APIConnectionError) return { error: t('errNet') };
+      if (e instanceof Anthropic.APIError) return { error: `${e.status || ''} ${esc(e.message || '')}` };
+      return { error: esc(e.message || String(e)) };
+    }
+  }
   SB.tutor = {
+    complete, online: isOnline,
     toggle, redraw: () => { if ($('#tutorPanel')) draw(); },
     ask(action) { toggle(true); const btn = SB.$(`#tutorPanel [data-q="${action}"]`); if (btn) btn.click(); }
   };

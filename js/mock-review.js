@@ -5,7 +5,7 @@
   const T = (bn, en) => (I18N.lang === 'en' ? en : bn);
   const plain = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
   const shuffle = a => { const x = [...a]; for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; } return x; };
-  const seedOf = k => (k === 'job' ? window.JOB_SEED_SQL : window.SEED_SQL);
+  const seedOf = k => SB.seedOf(k);
   const dayStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const addDays = k => { const d = new Date(); d.setDate(d.getDate() + k); return dayStr(d); };
   const fmtTime = s => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60), x = s % 60; return n(`${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`); };
@@ -39,6 +39,7 @@
       return { key, kind: 'sql', html: true, seedKey: 'main', q: pick(c.task), ex: c, hints: c.hints.map(h => pick(h)), explain: c.explain, level: c.level,
         topic: '🏆 ' + T('ইন্টারভিউ চ্যালেঞ্জ', 'Interview challenge'), src: pick(c.title), link: `#/challenges/${c.id}`, tables: c.tables, tableInfo: window.TABLE_INFO };
     }
+    if (SB.extraResolvers && SB.extraResolvers[type]) return SB.extraResolvers[type](key, a, b);
     return null;
   }
   const marksOf = it => (it.kind === 'sql' ? MARKS.sql[it.level] || 2 : MARKS[it.kind]);
@@ -92,6 +93,7 @@
     if (okCat('lessons')) LESSONS.forEach(l => l.quiz.forEach((_, i) => mcq.push(`quiz:${l.id}:${i}`)));
     if (okCat('challenges')) CHALLENGES.forEach(c => sql.push('ch:' + c.id));
     if (okCat('lessons')) Object.entries(window.PRACTICE || {}).forEach(([id, ps]) => ps.extra.forEach((_, i) => sql.push(`px:${id}:${i}`)));
+    (SB.extraPools || []).forEach(fn => fn(okCat, mcq, sql, viva));
     const lv = o.sqlLevels;
     return { mcq, sql: lv ? sql.filter(k => lv.includes(resolve(k).level)) : sql, viva };
   }
@@ -123,7 +125,7 @@
     if (sub === 'exam' && active) return renderExam(active);
     if (sub === 'result') return renderResult(store.get('sqlbn-mock-last', null));
     const hist = store.get('sqlbn-mock-history', []);
-    const cats = [...JOB_CATS.filter(c => c.id !== 'lecturer' || true).map(c => ({ id: c.id, label: `${c.icon} ${pick(c)}` })), { id: 'lessons', label: '📘 ' + T('লেসন কুইজ', 'Lesson quizzes') }, { id: 'challenges', label: '🏆 ' + T('ইন্টারভিউ চ্যালেঞ্জ', 'Interview challenges') }];
+    const cats = [...JOB_CATS.filter(c => c.id !== 'lecturer' || true).map(c => ({ id: c.id, label: `${c.icon} ${pick(c)}` })), { id: 'lessons', label: '📘 ' + T('লেসন কুইজ', 'Lesson quizzes') }, { id: 'challenges', label: '🏆 ' + T('ইন্টারভিউ চ্যালেঞ্জ', 'Interview challenges') }, ...(SB.extraCats || []).map(c => ({ id: c.id, label: pick(c.label) }))];
     const wrongCount = review.activeKeys().length;
     $('#app').innerHTML = `<div class="page">
       <h1>📝 ${T('মক টেস্ট', 'Mock Test')}</h1>

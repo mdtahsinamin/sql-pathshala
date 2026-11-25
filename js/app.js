@@ -5,7 +5,7 @@
   const SQLJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
   let currentLessonId = null;
   const plain = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
-  const seedOf = k => k === 'job' ? window.JOB_SEED_SQL : window.SEED_SQL;
+  const seedOf = k => SB.seedOf(k);
 
   // ═══════════════ শেয়ার করা অনুশীলন প্যানেল ═══════════════
   // o: { ex, seedKey, draftKey, tables, tableInfo, hints[], explain, isSolved, onSolved(), nextHtml, where, title, task }
@@ -48,7 +48,7 @@
         if (!sawSolution) { if (o.reviewKey) SB.review.record(o.reviewKey, true); if (o.onResult) o.onResult(true); }
         setStatus('ok', `${t('correct')} ${o.explain ? '' : ''}<div class="toolbar">${o.nextHtml ? o.nextHtml() : ''}${o.explain ? `<button class="btn sm" data-act="solution">${t('showExplain')}</button>` : ''}</div>`);
       } else {
-        setStatus('bad', `${t('notYet')} ${r.verdict.msg} <button class="btn sm ghost" data-act="tutor-wrong">${t('askTutor')}</button>`);
+        setStatus('bad', `${t('notYet')} ${r.verdict.msg} ${SB.compareModal ? `<button class="btn sm" data-act="compare">🔍 ${I18N.lang === 'en' ? 'What is different?' : 'পার্থক্য কোথায়?'}</button>` : ''} <button class="btn sm ghost" data-act="tutor-wrong">${t('askTutor')}</button>`);
       }
     };
     const cm = SB.makeEditor($('.pr-editor', host), store.get(o.draftKey, ''), run, SB.schemaOf((() => { const d = SB.freshDb(seed); setTimeout(() => d.close()); return d; })()));
@@ -77,6 +77,7 @@
       if (act === 'dialect') SB.showDialects(cm.getValue());
       if (act === 'tutor') SB.tutor.toggle(true);
       if (act === 'tutor-wrong') SB.tutor.ask('wrong');
+      if (act === 'compare') SB.compareModal(cm.getValue(), o.ex, seed, sawSolution || o.isSolved());
     });
     $('details.expected', host).addEventListener('toggle', function () {
       if (this.open) { try { $('.pr-expected', host).innerHTML = SB.tableHTML(SB.expectedResult(o.ex, seed), o.ex.check ? t('expectedAfter') : t('expected')); } catch (e) { } }
@@ -113,7 +114,7 @@
   }
   function setActiveTop(name) { $$('.topnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name)); }
   function chromeText() {
-    const map = { learn: 'learn', practice: 'practice', challenges: 'challenges', jobprep: 'jobprep', mock: 'mock', review: 'review', playground: 'playground', visualize: 'visualizer', explain: 'explainer', database: 'database', cheatsheet: 'cheatsheet' };
+    const map = { learn: 'learn', practice: 'practice', challenges: 'challenges', jobprep: 'jobprep', mock: 'mock', review: 'review', playground: 'playground', visualize: 'visualizer', explain: 'explainer', theory: 'theoryNav', database: 'database', cheatsheet: 'cheatsheet' };
     $$('.topnav a').forEach(a => { a.textContent = t(map[a.dataset.nav]); });
     $('#lessonSearch').placeholder = t('searchLessons');
     $('#langBtn').textContent = I18N.lang === 'en' ? 'বাং' : 'EN';
@@ -145,6 +146,7 @@
         </div>
         <div class="hero-code"><span class="k">SELECT</span> name, cgpa<br><span class="k">FROM</span> students<br><span class="k">WHERE</span> city = <span class="s">'Dhaka'</span><br><span class="k">ORDER BY</span> cgpa <span class="k">DESC</span>;</div>
       </section>
+      <div id="homeExtra"></div>
       ${SB.review.dueCount() ? `<div class="callout warn home-due">🔁 ${en ? `${SB.review.dueCount()} question(s) you got wrong are due for review today.` : `আজ রিভিউ করার মতো ${n(SB.review.dueCount())}টি ভুল প্রশ্ন আছে।`} <a class="btn sm primary" href="#/review/session?mode=due">${en ? 'Review now' : 'এখনই রিভিউ করো'}</a></div>` : ''}
       <div class="features">
         ${F('📝', en ? 'Timed mock tests' : 'মক টেস্ট', en ? 'Exam-style timed tests with negative marking, a question palette and topic-wise results.' : 'নেগেটিভ মার্কিং, প্রশ্ন প্যালেট ও টপিকভিত্তিক ফলাফলসহ সময় বাঁধা পরীক্ষা।', '#/mock')}
@@ -380,7 +382,9 @@
     SB.context = { where: 'practice hub' };
     const all = LESSONS.filter(l => practiceKeys(l.id).length);
     const tot = all.reduce((s, l) => s + practiceKeys(l.id).length, 0), done = all.reduce((s, l) => s + practiceKeys(l.id).filter(psSolved).length, 0);
+    const en = I18N.lang === 'en';
     $('#app').innerHTML = `<div class="page"><h1>🎯 ${t('psHubTitle')}</h1><p class="lead">${t('psHubLead')}</p>
+      <div class="hub-more">${[['#/debug', '🐞', en ? 'Find & fix the bug' : 'ভুল খুঁজে ঠিক করো', en ? 'Fix the classic mistakes' : 'পরীক্ষার পরিচিত ভুলগুলো ঠিক করো'], ['#/read', '👓', en ? 'Read the query' : 'কুয়েরি পড়ো', en ? 'Predict the result without running' : 'না চালিয়ে ফলাফল বলো'], ['#/cases', '💼', en ? 'Case studies' : 'কেস স্টাডি', en ? 'Real reports on real-looking data' : 'বাস্তবের মতো ডেটায় রিপোর্ট'], ['#/theory', '🏛️', en ? 'DBMS theory' : 'DBMS তত্ত্ব', en ? 'Theory + MCQ for exams' : 'পরীক্ষার তত্ত্ব + MCQ']].map(([h, i, a, b]) => `<a class="hub-more-card" href="${h}"><span>${i}</span><b>${a}</b><small>${b}</small></a>`).join('')}</div>
       <div class="pbar big"><span style="width:${tot ? done * 100 / tot : 0}%"></span></div><p class="muted">${n(done)}/${n(tot)} ${t('psSolved')}</p>
       ${SECTIONS.map(sec => { const ls = all.filter(l => l.section === sec.id); if (!ls.length) return ''; return `<h2>${sectionTitle(sec)}</h2><div class="ps-hub">${ls.map(l => {
         const ks = practiceKeys(l.id), d = ks.filter(psSolved).length, lessonDone = SB.lessonStatus(l) === 'done';
@@ -725,15 +729,19 @@
     $('#app').innerHTML = `<div class="page xp-page"><h1>🧠 ${en ? 'Query Explainer' : 'কুয়েরি ব্যাখ্যাকারী'}</h1>
       <p class="lead">${en ? 'Type or paste <b>any</b> SQL — SELECT, JOIN, subqueries, CTE, window functions, INSERT/UPDATE/DELETE, CREATE TABLE, triggers, transactions — even MySQL, Oracle or SQL Server syntax. Every part is explained in plain words, in the order the database actually runs it, with warnings about common mistakes.' : '<b>যেকোনো</b> SQL লেখো বা পেস্ট করো — SELECT, JOIN, সাবকুয়েরি, CTE, উইন্ডো ফাংশন, INSERT/UPDATE/DELETE, CREATE TABLE, ট্রিগার, ট্রানজ্যাকশন — এমনকি MySQL, Oracle বা SQL Server-এর কুয়েরিও। প্রতিটি অংশ সহজ ভাষায়, ডেটাবেস আসলে যে ক্রমে চালায় সেই ক্রমে বোঝানো হবে, সাথে সাধারণ ভুলের সতর্কতা।'}</p>
       <div class="samples"><span class="muted small">${t('samples')}</span> ${XP_SAMPLES.map((s, i) => `<button class="chip" data-x="${i}">${esc(pick(s[0]))}</button>`).join('')}</div>
+      <form class="xp-nl" id="xpNl"><input id="xpNlIn" placeholder="${en ? '🤖 Describe what you want, e.g. "students whose CGPA is above the average" — AI writes the SQL' : '🤖 কী চাও লেখো, যেমন "যাদের CGPA গড়ের বেশি তাদের নাম" — AI SQL লিখে দেবে'}"><button class="btn sm" type="submit">${en ? 'Write SQL' : 'SQL বানাও'}</button></form>
+      <div id="xpNlOut" class="muted small"></div>
       <div class="editor-wrap" id="xpEd"></div>
       <div class="toolbar"><button class="btn primary" id="xpGo">${en ? 'Explain' : 'ব্যাখ্যা করো'}</button>
         <button class="btn sm" id="xpRun">▶ ${en ? 'Run on demo DB' : 'ডেমো ডেটাবেসে চালাও'}</button>
         <button class="btn sm" id="xpViz">${t('visualize')}</button>
         <button class="btn sm" id="xpAi">🤖 ${en ? 'Ask AI for more' : 'AI-কে আরও জিজ্ঞেস করো'}</button>
+        <button class="btn sm" id="xpPlanBtn">📊 ${en ? 'Query plan' : 'কুয়েরি প্ল্যান'}</button>
         <button class="btn sm ghost" id="xpDia">${t('dialect')}</button>
         <span class="spacer"></span><label class="small">${t('dbLabel')} <select id="xpDb"><option value="auto">${en ? 'Auto' : 'নিজে বুঝে'}</option><option value="main">${t('mainDb')}</option><option value="job">${t('jobDb')}</option></select></label>
         <span class="shortcut"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span></div>
       <div id="xpOut"></div>
+      <div id="xpPlan"></div>
       <div id="xpRunOut"></div></div>`;
     const seedKey = () => $('#xpDb').value === 'auto' ? SB.explainGuessSeed(cm.getValue()) : $('#xpDb').value;
     const go = () => { SB.renderExplain($('#xpOut'), cm.getValue()); store.set('sqlbn-xp-draft', cm.getValue()); };
@@ -753,6 +761,18 @@
     $('#xpViz').onclick = () => SB.visualize(cm.getValue(), SB.freshDb(seedOf(seedKey())));
     $('#xpAi').onclick = () => { SB.tutor.toggle(true); SB.tutor.ask('explain'); };
     $('#xpDia').onclick = () => SB.showDialects(cm.getValue());
+    $('#xpPlanBtn').onclick = () => { SB.renderPlan($('#xpPlan'), cm.getValue(), seedKey()); $('#xpPlan').scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+    $('#xpNl').onsubmit = async e => {
+      e.preventDefault(); const q = $('#xpNlIn').value.trim(); if (!q) return;
+      if (!SB.tutor.online()) { $('#xpNlOut').innerHTML = en ? 'This needs AI: add your Anthropic API key (or a proxy URL) in the AI tutor\'s ⚙ settings.' : 'এর জন্য AI লাগবে: AI টিউটরের ⚙ সেটিংসে তোমার Anthropic API key (বা proxy URL) দাও।'; SB.tutor.toggle(true); return; }
+      $('#xpNlOut').textContent = en ? 'Writing SQL…' : 'SQL লেখা হচ্ছে…';
+      const db = $('#xpDb').value === 'auto' ? 'main' : $('#xpDb').value;
+      const r = await SB.nlToSql(q, db);
+      if (r.error) { $('#xpNlOut').innerHTML = `<span class="err">${r.error}</span>`; return; }
+      const m = r.text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+      if (m) { cm.setValue(m[1].trim()); go(); runIt(); }
+      $('#xpNlOut').innerHTML = esc(r.text.replace(/```[\s\S]*?```/g, '').trim());
+    };
     $('#app').onclick = e => { const b = e.target.closest('[data-x]'); if (b) { cm.setValue(XP_SAMPLES[+b.dataset.x][1]); go(); $('#xpRunOut').innerHTML = ''; } };
     go();
   }
@@ -881,7 +901,7 @@
     const app = $('#app'); app.onclick = null; app.ondblclick = null;
     const parts = (location.hash.slice(1).split('?')[0] || '/').split('/').filter(Boolean);
     const [p0, p1, p2] = parts;
-    if (!p0) renderHome();
+    if (!p0) { renderHome(); if (SB.renderHomeExtras) SB.renderHomeExtras($('#homeExtra')); }
     else if (p0 === 'learn') renderLesson(p1 || 'intro');
     else if (p0 === 'practice') renderPracticeHub();
     else if (p0 === 'challenges') renderChallenges(p1);
@@ -889,6 +909,7 @@
     else if (p0 === 'playground') renderPlayground();
     else if (p0 === 'visualize') renderVisualize();
     else if (p0 === 'explain') renderExplainPage();
+    else if (SB.pages && SB.pages[p0]) { document.body.classList.add('no-sidebar'); currentLessonId = null; setActiveTop(p0); SB.pages[p0](p1, p2); }
     else if (p0 === 'database') renderDatabase();
     else if (p0 === 'cheatsheet') renderCheat();
     else if (p0 === 'profile') renderProfilePage();

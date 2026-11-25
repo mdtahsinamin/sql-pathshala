@@ -1,10 +1,10 @@
 // সার্ভিস ওয়ার্কার — অ্যাপ ও CDN লাইব্রেরি ক্যাশ করে, যাতে ইন্টারনেট ছাড়াও চলে।
 // (AI টিউটরের Anthropic API কল কখনো ক্যাশ হয় না।)
-const VERSION = 'sqlbn-v6';
+const VERSION = 'sqlbn-v7';
 const APP_SHELL = [
-  './', 'index.html', 'css/style.css', 'css/features.css', 'css/mock.css', 'css/practice.css', 'css/explain.css','icon.svg', 'manifest.webmanifest',
+  './', 'index.html', 'css/style.css', 'css/features.css', 'css/mock.css', 'css/practice.css', 'css/explain.css', 'css/more.css','icon.svg', 'manifest.webmanifest',
   'js/i18n.js', 'js/db.js', 'js/lessons.js', 'js/lessons-adv.js', 'js/lessons-en.js', 'js/challenges.js', 'js/jobprep.js', 'js/jobprep-en.js', 'js/practice-sets.js', 'js/practice-more.js', 'js/challenges-more.js',
-  'js/core.js', 'js/visualizer.js', 'js/explain.js', 'js/dialect.js', 'js/er.js', 'js/tutor.js', 'js/profile.js', 'js/mock-review.js', 'js/app.js'
+  'js/core.js', 'js/visualizer.js', 'js/explain.js', 'js/dialect.js', 'js/er.js', 'js/tutor.js', 'js/profile.js', 'js/mock-review.js', 'js/config.js', 'js/skills.js', 'js/theory.js', 'js/cases.js', 'js/extras.js', 'js/app.js'
 ];
 const CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js',
