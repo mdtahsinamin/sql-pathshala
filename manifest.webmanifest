@@ -1,0 +1,14 @@
+{
+  "name": "SQL পাঠশালা — SQL Pathshala",
+  "short_name": "SQL পাঠশালা",
+  "description": "বাংলা ও ইংরেজিতে ইন্টারঅ্যাকটিভ SQL শেখা — Learn SQL interactively in Bangla & English",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0e9f6e",
+  "lang": "bn",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

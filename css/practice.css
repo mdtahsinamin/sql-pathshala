@@ -1,0 +1,37 @@
+/* টপিকভিত্তিক অনুশীলন সেট */
+.practice-set { margin-top: 44px; padding-top: 8px; border-top: 2px dashed var(--border); }
+.practice-set h2 { border-bottom: 0; margin-top: 18px; }
+.ps-progress { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 14px; }
+.ps-list { display: grid; gap: 10px; }
+.ps-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 12px 14px; transition: border-color .15s; }
+.ps-card.open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ps-card.solved { border-left: 4px solid var(--accent); }
+.ps-head { display: flex; gap: 12px; align-items: flex-start; }
+.ps-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); }
+.ps-card.solved .ps-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ps-main { flex: 1; min-width: 0; }
+.ps-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.ps-q { font-size: 16px; line-height: 1.6; }
+.ps-src { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+.ps-src.this { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); background: var(--blue-soft); }
+.ps-src.job { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-soft); }
+.ps-src.ch { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+.ps-work:not(:empty) { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ps-hub { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.ps-hub-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.ps-hub-card:hover { text-decoration: none; border-color: var(--accent); }
+.ps-hub-card.solved { border-left: 4px solid var(--accent); }
+.ps-hub-top, .ps-hub-bot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ps-hub-card .pbar { max-width: none; }
+@media (max-width: 640px) { .ps-head { flex-wrap: wrap; } .ps-head > .btn { width: 100%; } }
+
+/* চাকরি প্রস্তুতি — প্রশ্নপত্রের মতো ইংরেজি প্রধান */
+.exam-q .q-en { font-size: 17px; line-height: 1.7; }
+.exam-q .q-bn, .ps-q .q-bn, .task-box .q-bn { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 15px; color: var(--text-2); line-height: 1.6; }
+.q-bn > span { font-weight: 700; color: var(--muted); margin-right: 4px; }
+.jp-q[lang=en] { font-family: var(--font); }
+/* চ্যালেঞ্জ খোঁজা */
+.ch-search { padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; min-width: 200px; }
+#chTopic { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; max-width: 220px; }
+.ch-card[hidden] { display: none; }
+@media (max-width: 640px) { .ch-search, #chTopic { min-width: 0; width: 100%; max-width: none; } }
